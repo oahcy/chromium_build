@@ -54,6 +54,7 @@ if (sysroot == "") {
       assert(false, "No linux sysroot for cpu: $target_cpu")
     }
 
+    print("sysroot $sysroot")
     if (sysroot != "") {
       _script_arch = current_cpu
       if (_script_arch == "x86") {

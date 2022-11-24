@@ -72,6 +72,8 @@ def RunLinkWithOptionalMapFile(command, env=None, map_file=None):
 
   result = subprocess.call(command, env=env)
 
+  print(tmp_map_path)
+  print(map_file)
   if tmp_map_path and result == 0:
     threading.Thread(
         target=lambda: _GzipThenDelete(tmp_map_path, map_file)).start()

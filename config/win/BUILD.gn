@@ -56,6 +56,7 @@ config("compiler") {
       "/safeseh",
     ]
   }
+  if (current_cpu == "x86" || current_cpu == "x64") {
 
   cflags = [
     "/Gy",  # Enable function-level linking.
@@ -105,12 +106,15 @@ config("compiler") {
       assert(false, "unknown current_cpu " + current_cpu)
     }
 
+    cflags += ["-Wno-invalid-offsetof"]
+
+
     # Chrome currently requires SSE3. Clang supports targeting any Intel
     # microarchitecture. MSVC only supports a subset of architectures, and the
     # next step after SSE2 will be AVX.
-    if (current_cpu == "x86" || current_cpu == "x64") {
-      cflags += [ "-msse3" ]
-    }
+    #if (current_cpu == "x86" || current_cpu == "x64") {
+      #cflags += [ "-msse3" ]
+    #}
 
     if (exec_script("//build/win/use_ansi_codes.py", [], "trim string") ==
         "True") {
@@ -186,6 +190,7 @@ config("compiler") {
     # the source file is a no-op.
     "/ignore:4221",
   ]
+  }
 }
 
 # This is included by reference in the //build/config/compiler:runtime_library
@@ -277,6 +282,9 @@ config("winver") {
 
 # Linker flags for Windows SDK setup, this is applied only to EXEs and DLLs.
 config("sdk_link") {
+  if (current_cpu == "arm64") {
+    #nothing
+  } else {
   assert(current_cpu == "x64" || current_cpu == "x86" || current_cpu == "arm" ||
              current_cpu == "arm64",
          "Only supports x64, x86, arm and arm64 CPUs")
@@ -318,6 +326,7 @@ config("sdk_link") {
   if (defined(vc_lib_atlmfc_path)) {
     lib_dirs += [ "$vc_lib_atlmfc_path" ]
   }
+  }
 }
 
 # This default linker setup is provided separately from the SDK setup so
@@ -345,12 +354,14 @@ config("default_cfg_compiler") {
   # This is needed to allow functions to be called by code that is built
   # with CFG enabled, such as system libraries.
   # The CFG guards are only emitted if |win_enable_cfg_guards| is enabled.
+  if (current_cpu == "x64" && current_cpu == "x86") {
   if (is_clang) {
     if (win_enable_cfg_guards) {
       cflags = [ "/guard:cf" ]
     } else {
       cflags = [ "/guard:cf,nochecks" ]
     }
+  }
   }
 }
 
@@ -360,8 +371,10 @@ config("disable_guards_cfg_compiler") {
   # Emit table of address-taken functions for Control-Flow Guard (CFG).
   # This is needed to allow functions to be called by code that is built
   # with CFG enabled, such as system libraries.
+  if (current_cpu == "x64" && current_cpu == "x86") {
   if (is_clang) {
     cflags = [ "/guard:cf,nochecks" ]
+  }
   }
 }
 
@@ -510,11 +523,13 @@ config("dynamic_crt") {
 }
 
 config("static_crt") {
+  if (current_cpu == "x64" || current_cpu == "x86") {
   if (is_debug) {
     # This pulls in the static debug CRT and defines _DEBUG
     cflags = [ "/MTd" ]
   } else {
     cflags = [ "/MT" ]
+  }
   }
 }
 

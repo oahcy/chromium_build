@@ -10,9 +10,29 @@ import("//build/toolchain/cc_wrapper.gni")
 import("//build/toolchain/goma.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/toolchain/toolchain.gni")
+import("//build/toolchain/gcc_toolchain.gni")
 
+print("toolchain/win is_win : $is_win")
 # Should only be running on Windows.
-assert(is_win)
+#if(is_win) {
+
+gcc_toolchain("NX64") {
+  sdk_root = getenv("NINTENDO_SDK_ROOT")
+  COMPILER_ARCH="aarch64"
+
+  prefix = "${sdk_root}/Compilers/NX/nx/${COMPILER_ARCH}/bin"
+  cc = "${prefix}/clang-cl.bat"
+  cxx = "${prefix}/clang-cl.bat"
+
+  readelf = "${prefix}/llvm-readelf.exe"
+  nm = "${prefix}/llvm-nm.exe"
+  ar = "${prefix}/llvm-ar.exe"
+  ld = cxx
+    toolchain_args = {
+    current_cpu = "x64"
+    current_os = "win"
+  }
+}
 
 # Setup the Visual Studio state.
 #
@@ -56,7 +76,7 @@ if (current_toolchain == default_toolchain) {
                 "copy_dlls",
                 rebase_path(root_build_dir),
                 configuration_name,
-                target_cpu,
+                "x64",
               ])
 }
 
@@ -74,6 +94,7 @@ if (host_os == "win") {
 #   current_os: current_os to pass as a build arg
 template("msvc_toolchain") {
   toolchain(target_name) {
+    print("msvc_toolchain target_name : $target_name")
     # When invoking this toolchain not as the default one, these args will be
     # passed to the build. They are ignored when this is the default toolchain.
     assert(defined(invoker.toolchain_args))
@@ -130,11 +151,14 @@ template("msvc_toolchain") {
       env_wrapper = ""
       sys_include_flags =
           "${invoker.sys_include_flags} "  # Note trailing space.
-    } else {
+    } else if (target_name != "nx_clang_arm64") {
       # clang-cl doesn't need this env hoop, so omit it there.
       assert((defined(toolchain_args.is_clang) && !toolchain_args.is_clang) ||
              !is_clang)
       env_wrapper = "ninja -t msvc -e $env -- "  # Note trailing space.
+      sys_include_flags = ""
+    } else {
+      env_wrapper = ""
       sys_include_flags = ""
     }
 
@@ -151,7 +175,12 @@ template("msvc_toolchain") {
       # relying on mt.exe being in %PATH% on Windows, https://crbug.com/872740
       linker_wrapper = "ninja -t msvc -e $env -- "  # Note trailing space.
       sys_lib_flags = "${invoker.sys_lib_flags} "  # Note trailing space.
-    } else {
+    } else if (target_name == "nx_clang_arm64") {
+      linker_wrapper =
+          "$python_path $tool_wrapper_path link-wrapper environment.x64 False "
+      sys_lib_flags = ""
+    } 
+    else {
       # Note trailing space:
       linker_wrapper =
           "$python_path $tool_wrapper_path link-wrapper $env False "
@@ -309,6 +338,8 @@ template("msvc_toolchain") {
       # The use of inputs_newline is to work around a fixed per-line buffer
       # size in the linker.
       rspfile_content = "{{inputs_newline}}"
+      print("alink rspfile_content : $rspfile_content")
+
     }
 
     tool("solink") {
@@ -344,6 +375,7 @@ template("msvc_toolchain") {
       # The use of inputs_newline is to work around a fixed per-line buffer
       # size in the linker.
       rspfile_content = "{{libs}} {{solibs}} {{inputs_newline}} {{ldflags}}"
+      print("solink rspfile_content : $rspfile_content")
     }
 
     tool("solink_module") {
@@ -367,6 +399,7 @@ template("msvc_toolchain") {
       # The use of inputs_newline is to work around a fixed per-line buffer
       # size in the linker.
       rspfile_content = "{{libs}} {{solibs}} {{inputs_newline}} {{ldflags}}"
+      print("solink_module rspfile_content : $rspfile_content")
     }
 
     tool("link") {
@@ -389,6 +422,7 @@ template("msvc_toolchain") {
       # The use of inputs_newline is to work around a fixed per-line buffer
       # size in the linker.
       rspfile_content = "{{inputs_newline}} {{libs}} {{solibs}} {{ldflags}}"
+      print("link rspfile_content : $rspfile_content")
     }
 
     # These two are really entirely generic, but have to be repeated in
@@ -414,6 +448,34 @@ template("msvc_toolchain") {
 template("win_toolchains") {
   assert(defined(invoker.toolchain_arch))
   toolchain_arch = invoker.toolchain_arch
+  print("target_name: $target_name , toolchain_arch : $toolchain_arch")
+
+  if (target_name == "arm64") {
+  msvc_toolchain("nx_clang_" + target_name) {
+    sdk_root = getenv("NINTENDO_SDK_ROOT")
+    COMPILER_ARCH="aarch64"
+    prefix = "${sdk_root}/Compilers/NX/nx/${COMPILER_ARCH}/bin"
+    environment = "environment." + toolchain_arch
+    cl = "$prefix/clang-cl.bat"
+    _clang_lib_dir = "D:/Nintendo/xx/NintendoSDK/Libraries/NX-NXFP2-a64/Debug"
+    if (host_os == "win") {
+      # Flip the slashes so that copy/paste of the command works.
+      cl = string_replace(cl, "/", "\\")
+
+      # And to match the other -libpath flags.
+      _clang_lib_dir = string_replace(_clang_lib_dir, "/", "\\")
+    }
+
+    toolchain_args = {
+      if (defined(invoker.toolchain_args)) {
+        forward_variables_from(invoker.toolchain_args, "*")
+      }
+      is_clang = true
+      current_os = "win"
+      current_cpu = toolchain_arch
+    }
+  }
+  } else {
 
   win_toolchain_data = exec_script("setup_toolchain.py",
                                    [
@@ -421,8 +483,8 @@ template("win_toolchains") {
                                      windows_sdk_path,
                                      visual_studio_runtime_dirs,
                                      "win",
-                                     toolchain_arch,
-                                     "environment." + toolchain_arch,
+                                     "x64",
+                                     "environment." + "x64",
                                    ],
                                    "scope")
 
@@ -474,8 +536,10 @@ template("win_toolchains") {
       current_cpu = toolchain_arch
     }
   }
+  }
 }
 
+print("target_cpu : $target_cpu")
 if (target_cpu == "x86" || target_cpu == "x64") {
   win_toolchains("x86") {
     toolchain_arch = "x86"
@@ -532,3 +596,4 @@ if (target_os == "winuwp") {
     }
   }
 }
+#}

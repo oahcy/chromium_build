@@ -60,7 +60,7 @@
 #else
 #define OS_MAC 1
 #endif  // defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__nx__)
 #if !defined(OS_CHROMEOS)
 // Do not define OS_LINUX on Chrome OS build.
 // The OS_CHROMEOS macro is defined in GN.

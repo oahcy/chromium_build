@@ -23,8 +23,10 @@ import("//build/toolchain/rbe.gni")
 import("//build/toolchain/toolchain.gni")
 import("//build_overrides/build.gni")
 
+is_current_arm = false
 if (current_cpu == "arm" || current_cpu == "arm64") {
   import("//build/config/arm.gni")
+  is_current_arm = true
 }
 if (current_cpu == "mipsel" || current_cpu == "mips64el" ||
     current_cpu == "mips" || current_cpu == "mips64") {
@@ -288,14 +290,14 @@ config("compiler") {
   # so only enable it if using_clang. See: https://gcc.gnu.org/PR97913
   # TODO(mpdenton): remove is_clang once GCC bug is fixed.
   if (!is_nacl && !is_ubsan && is_clang) {
-    cflags += [ "-fno-delete-null-pointer-checks" ]
+    #cflags += [ "-fno-delete-null-pointer-checks" ]
   }
 
   # Don't emit the GCC version ident directives, they just end up in the
   # .comment section or debug info taking up binary size, and makes comparing
   # .o files built with different compiler versions harder.
   if (!is_win || is_clang) {
-    cflags += [ "-fno-ident" ]
+    #cflags += [ "-fno-ident" ]
   }
 
   # In general, Windows is totally different, but all the other builds share
@@ -1298,7 +1300,7 @@ config("runtime_library") {
   # TODO(crbug.com/830987): Come up with a better name for is POSIX + Fuchsia
   # configuration.
   if (is_posix || is_fuchsia) {
-    configs += [ "//build/config/posix:runtime_library" ]
+    #configs += [ "//build/config/posix:runtime_library" ]
   }
 
   # System-specific flags. If your compiler flags apply to one of the
@@ -1307,7 +1309,7 @@ config("runtime_library") {
   if (is_win) {
     configs += [ "//build/config/win:runtime_library" ]
   } else if (is_linux || is_chromeos) {
-    configs += [ "//build/config/linux:runtime_library" ]
+    #configs += [ "//build/config/linux:runtime_library" ]
   } else if (is_ios) {
     configs += [ "//build/config/ios:runtime_library" ]
   } else if (is_mac) {
@@ -1332,7 +1334,8 @@ config("default_warnings") {
   cflags_cc = []
   ldflags = []
 
-  if (is_win) {
+  print("current_os : $current_os , current_cpu : $current_cpu")
+  if (is_win && !is_current_arm) {
     if (treat_warnings_as_errors) {
       cflags += [ "/WX" ]
     }
@@ -1635,7 +1638,7 @@ config("default_warnings") {
 # part of Chromium.
 
 config("chromium_code") {
-  if (is_win) {
+  if (is_win && !is_current_arm) {
     cflags = [ "/W4" ]  # Warning level 4.
 
     if (is_clang) {
@@ -1792,7 +1795,7 @@ config("rtti") {
 config("no_rtti") {
   # Some sanitizer configs may require RTTI to be left enabled globally
   if (!use_rtti) {
-    if (is_win) {
+    if (is_win && !is_current_arm) {
       cflags_cc = [ "/GR-" ]
     } else {
       cflags_cc = [ "-fno-rtti" ]
@@ -1968,7 +1971,7 @@ config("no_incompatible_pointer_warnings") {
 
 # Shared settings for both "optimize" and "optimize_max" configs.
 # IMPORTANT: On Windows "/O1" and "/O2" must go before the common flags.
-if (is_win) {
+if (is_win && !is_current_arm) {
   common_optimize_on_cflags = [
     "/Ob2",  # Both explicit and auto inlining.
     "/Oy-",  # Disable omitting frame pointers, must be after /O2.
@@ -2069,7 +2072,7 @@ config("default_stack_frames") {
 
 # Default "optimization on" config.
 config("optimize") {
-  if (is_win) {
+  if (is_win && !is_current_arm) {
     if (chrome_pgo_phase != 2) {
       # Favor size over speed, /O1 must be before the common flags.
       # /O1 implies /Os and /GF.
@@ -2156,7 +2159,7 @@ config("optimize_max") {
     configs = [ "//build/config/nacl:irt_optimize" ]
   } else {
     ldflags = common_optimize_on_ldflags
-    if (is_win) {
+    if (is_win && !is_current_arm) {
       # Favor speed over size, /O2 must be before the common flags.
       # /O2 implies /Ot, /Oi, and /GF.
       cflags = [ "/O2" ] + common_optimize_on_cflags
@@ -2188,7 +2191,7 @@ config("optimize_speed") {
     configs = [ "//build/config/nacl:irt_optimize" ]
   } else {
     ldflags = common_optimize_on_ldflags
-    if (is_win) {
+    if (is_win && !is_current_arm) {
       # Favor speed over size, /O2 must be before the common flags.
       # /O2 implies /Ot, /Oi, and /GF.
       cflags = [ "/O2" ] + common_optimize_on_cflags
@@ -2320,7 +2323,7 @@ config("win_pdbaltpath") {
 
 # Full symbols.
 config("symbols") {
-  if (is_win) {
+  if (is_win && !is_current_arm) {
     if (is_clang) {
       cflags = [ "/Z7" ]  # Debug information in the .obj files.
     } else {
